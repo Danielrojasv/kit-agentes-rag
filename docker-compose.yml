@@ -1,0 +1,54 @@
+# Andamiaje de servicios del kit:
+# - postgres con pgvector (base del RAG y de Langfuse)
+# - langfuse v2 (observabilidad de trazas LLM, auto-hospedado)
+# - app FastAPI del kit
+#
+# Uso: cp .env.example .env && docker compose up -d
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir en .env}
+      POSTGRES_DB: kit
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-langfuse-db.sql:/docker-entrypoint-initdb.d/10-langfuse.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kit}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  langfuse:
+    image: langfuse/langfuse:2
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kit}:${POSTGRES_PASSWORD}@postgres:5432/langfuse
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?definir en .env}
+      SALT: ${LANGFUSE_SALT:?definir en .env}
+      TELEMETRY_ENABLED: "false"
+    ports:
+      - "3000:3000"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: "8000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kit}:${POSTGRES_PASSWORD}@postgres:5432/kit
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
