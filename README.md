@@ -19,6 +19,11 @@ y un flujo de 4 pasos con estados y trazabilidad.
   almacén en memoria si no hay Postgres, `ModoReglas` si no hay ningún
   modelo con red. El sistema nunca queda en negro y siempre dice qué
   proveedor respondió.
+- **Motor intercambiable.** La API consume la interfaz `MotorRag`
+  (`src/nucleo/motor.ts`) y el motor se elige con `MOTOR_RAG` (`nucleo`
+  por defecto, `langchain` como enchufe futuro). El motor LangChain
+  importa la librería tarde y, mientras no esté instalada o implementada,
+  degrada al núcleo diciéndolo en el campo `motor` de la respuesta.
 - **Humano al final.** El flujo termina en `ejecutable`,
   `requiere_revision` o `bloqueada`; nada se autoejecuta.
 - **Trazabilidad.** Cada caso guarda su traza; el bus puede escribir un

@@ -6,4 +6,5 @@ export * from "./almacen";
 export * from "./modelos";
 export * from "./ingesta";
 export * from "./rag";
+export * from "./motor";
 export * from "./flujo";

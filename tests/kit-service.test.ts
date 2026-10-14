@@ -9,7 +9,7 @@ import { KitService } from "../src/api/kit.service";
 describe("KitService (sin claves: modo degradado completo)", () => {
   it("salud parte en cero y la ingesta suma", async () => {
     const kit = new KitService();
-    expect(kit.salud()).toEqual({ ok: true, fragmentos: 0 });
+    expect(kit.salud()).toEqual({ ok: true, fragmentos: 0, motor: "nucleo" });
 
     const dir = mkdtempSync(join(tmpdir(), "kit-"));
     const doc = join(dir, "doc.txt");

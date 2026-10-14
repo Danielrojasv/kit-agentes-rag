@@ -20,6 +20,8 @@ export interface RespuestaRag {
   proveedor: string;
   fuentes: string[];
   resultados: Resultado[];
+  /** Qué motor produjo la respuesta (lo llena la capa de motores). */
+  motor?: string;
 }
 
 export async function consultar(

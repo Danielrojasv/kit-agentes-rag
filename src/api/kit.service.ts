@@ -4,11 +4,13 @@
  * Sin claves: embeddings deterministas, almacén en memoria y modo reglas
  * (el kit corre igual, degradado y lo dice). Con claves: Gemini para
  * embeddings y la cadena Claude → Gemini → reglas.
+ *
+ * El motor RAG se elige con MOTOR_RAG (nucleo | langchain, default
+ * nucleo); la API solo conoce la interfaz MotorRag.
  */
 import { Injectable } from "@nestjs/common";
 
 import {
-  Almacen,
   AlmacenMemoria,
   CadenaProveedores,
   ClaudeProveedor,
@@ -17,17 +19,15 @@ import {
   GeminiEmbeddings,
   GeminiProveedor,
   ModoReglas,
+  MotorRag,
   Proveedor,
   RespuestaRag,
-  consultar,
-  ingestar,
+  crearMotor,
 } from "../nucleo";
 
 @Injectable()
 export class KitService {
-  private readonly embeddings: Embeddings;
-  private readonly almacen: AlmacenMemoria;
-  private readonly proveedor: Proveedor;
+  private readonly motor: MotorRag;
   private fragmentos = 0;
 
   constructor() {
@@ -36,24 +36,28 @@ export class KitService {
     if (process.env.GEMINI_API_KEY) proveedores.push(new GeminiProveedor());
     proveedores.push(new ModoReglas());
 
-    this.embeddings = process.env.GEMINI_API_KEY
+    const embeddings: Embeddings = process.env.GEMINI_API_KEY
       ? new GeminiEmbeddings()
       : new EmbeddingsDeterministas();
-    this.almacen = new AlmacenMemoria();
-    this.proveedor = new CadenaProveedores(proveedores);
+
+    this.motor = crearMotor(process.env.MOTOR_RAG, {
+      embeddings,
+      almacen: new AlmacenMemoria(),
+      proveedor: new CadenaProveedores(proveedores),
+    });
   }
 
-  salud(): { ok: boolean; fragmentos: number } {
-    return { ok: true, fragmentos: this.fragmentos };
+  salud(): { ok: boolean; fragmentos: number; motor: string } {
+    return { ok: true, fragmentos: this.fragmentos, motor: this.motor.nombre };
   }
 
   async ingestar(rutas: string[]): Promise<{ fragmentosNuevos: number; fragmentosTotal: number }> {
-    const n = await ingestar(rutas, this.embeddings, this.almacen);
+    const n = await this.motor.ingestar(rutas);
     this.fragmentos += n;
     return { fragmentosNuevos: n, fragmentosTotal: this.fragmentos };
   }
 
   async consultar(pregunta: string, k = 4): Promise<RespuestaRag> {
-    return consultar(pregunta, this.embeddings, this.almacen, this.proveedor, k);
+    return this.motor.consultar(pregunta, k);
   }
 }
