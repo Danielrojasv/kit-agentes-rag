@@ -92,6 +92,49 @@ export class GeminiProveedor implements Proveedor {
 }
 
 /**
+ * Proveedor para cualquier gateway o servidor que exponga la API de
+ * chat de OpenAI (chat/completions): vLLM, Ollama, LiteLLM, OpenRouter,
+ * gateways corporativos, etc.
+ *
+ * `baseURL` se usa tal cual y se le agrega `/chat/completions`; si el
+ * servidor sirve bajo `/v1`, incluirlo en la baseURL.
+ */
+export class ProveedorOpenAICompatible implements Proveedor {
+  readonly nombre: string;
+
+  constructor(
+    private baseURL = process.env.OPENAI_COMPAT_BASE_URL ?? "",
+    private apiKey = process.env.OPENAI_COMPAT_API_KEY ?? "",
+    private modelo = process.env.OPENAI_COMPAT_MODELO ?? "",
+    private timeoutMs = 60_000,
+  ) {
+    if (!this.baseURL) throw new Error("falta OPENAI_COMPAT_BASE_URL para ProveedorOpenAICompatible");
+    if (!this.modelo) throw new Error("falta OPENAI_COMPAT_MODELO para ProveedorOpenAICompatible");
+    this.baseURL = this.baseURL.replace(/\/+$/, "");
+    this.nombre = `openai-compatible:${this.modelo}`;
+  }
+
+  async responder(sistema: string, mensaje: string): Promise<RespuestaModelo> {
+    const headers: Record<string, string> = {};
+    if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
+    const datos = await postJson(
+      `${this.baseURL}/chat/completions`,
+      {
+        model: this.modelo,
+        max_tokens: 1024,
+        messages: [
+          { role: "system", content: sistema },
+          { role: "user", content: mensaje },
+        ],
+      },
+      headers,
+      this.timeoutMs,
+    );
+    return { texto: datos.choices[0].message.content, proveedor: this.nombre };
+  }
+}
+
+/**
  * Degradado final: responde con una función de reglas puras.
  *
  * La función de reglas la define cada dominio (por ejemplo: clasificar

@@ -3,7 +3,8 @@
  *
  * Sin claves: embeddings deterministas, almacén en memoria y modo reglas
  * (el kit corre igual, degradado y lo dice). Con claves: Gemini para
- * embeddings y la cadena Claude → Gemini → reglas.
+ * embeddings y la cadena gateway OpenAI-compatible → Claude → Gemini →
+ * reglas (cada pieza entra solo si su variable de entorno existe).
  *
  * El motor RAG se elige con MOTOR_RAG (nucleo | langchain, default
  * nucleo); la API solo conoce la interfaz MotorRag.
@@ -21,6 +22,7 @@ import {
   ModoReglas,
   MotorRag,
   Proveedor,
+  ProveedorOpenAICompatible,
   RespuestaRag,
   crearMotor,
 } from "../nucleo";
@@ -32,6 +34,17 @@ export class KitService {
 
   constructor() {
     const proveedores: Proveedor[] = [];
+    if (process.env.OPENAI_COMPAT_BASE_URL) {
+      // OPENAI_COMPAT_MODELOS admite varios modelos separados por coma;
+      // cada uno entra a la cadena en orden como respaldo del anterior.
+      const modelos = (process.env.OPENAI_COMPAT_MODELOS ?? process.env.OPENAI_COMPAT_MODELO ?? "")
+        .split(",")
+        .map((m) => m.trim())
+        .filter(Boolean);
+      for (const modelo of modelos) {
+        proveedores.push(new ProveedorOpenAICompatible(undefined, undefined, modelo));
+      }
+    }
     if (process.env.ANTHROPIC_API_KEY) proveedores.push(new ClaudeProveedor());
     if (process.env.GEMINI_API_KEY) proveedores.push(new GeminiProveedor());
     proveedores.push(new ModoReglas());
